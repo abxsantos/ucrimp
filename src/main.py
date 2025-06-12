@@ -1,14 +1,14 @@
 import asyncio
 
-from calculations import calculate_linear_regression
+from calculations import calculate_linear_regression, CalibrationPoint
 from device import Esp32HX711, UCrimpDevice
 
 
 async def main() -> None:
     calibration_points = [
-        (137312.0, 0.0),  # 0 kg
-        (1284359.0, 61.20),  # 61.20 kg
-        (1734991.0, 81.50),  # 81.50 kg
+        CalibrationPoint(weight=0.0, raw_value=137312.0),
+        CalibrationPoint(weight=61.20, raw_value=1284359.0),
+        CalibrationPoint(weight=81.50, raw_value=1734991.0),
     ]
     slope, intercept = calculate_linear_regression(calibration_points)
     hx711 = Esp32HX711(dt=5, sck=6)

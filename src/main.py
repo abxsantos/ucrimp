@@ -1,6 +1,6 @@
 import asyncio
 
-from calculations import calculate_linear_regression, CalibrationPoint
+from calculations import CalibrationPoint, calculate_linear_regression
 from device import Esp32HX711, UCrimpDevice
 
 

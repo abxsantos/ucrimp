@@ -29,7 +29,7 @@ def calibrate():
     """
     Function that will execute the calibration logic.
 
-    This will wait for the user to input the current weight value and will print the median of the raw 
+    This will wait for the user to input the current weight value and will print the median of the raw
     values based on the samples amount.
 
     A good starting point of weights to be used for calibration is:

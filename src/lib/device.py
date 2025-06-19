@@ -126,14 +126,16 @@ class Esp32HX711:
 
     def setup(self) -> None:
         self.led.value(0)
+        self.hx711.power_up()
         self.hx711.set_gain(128)
-        self.hx711.get_value()
+        self.hx711.read()
 
     def off(self) -> None:
+        self.hx711.graceful_shutdown()
         self.led.value(1)
 
     def read_raw_value(self) -> float:
-        return self.hx711.get_value()
+        return self.hx711.read()
 
     def read_multiple_values(self, samples: int = 3) -> list[float]:
         return [self.read_raw_value() for _ in range(samples)]
@@ -181,9 +183,9 @@ class UCrimpDevice:
         self.service_uuid = service_uuid
         self.data_point_characteristic_uuid = data_point_characteristic_uuid
         self.control_point_characteristic_uuid = control_point_characteristic_uuid
-
-        # Initialize BLE service and characteristic
-        self.setup_ble_service()
+                
+        # Initialize task references
+        self.tasks = []
 
     def start_measurement(self):
         """Start a measurement"""
@@ -487,14 +489,17 @@ class UCrimpDevice:
         self.perform_tare()
         self.setup_ble_service()
         self.is_running.set()
-
         try:
-            advertise_task = asyncio.create_task(self.advertise())
-            measurement_task = asyncio.create_task(self.measurement_task())
-            gatt_events_task = asyncio.create_task(self.gatt_events_task())
+            # Create and store task references
+            self.advertise_task = asyncio.create_task(self.advertise())
+            self.measurement_task = asyncio.create_task(self.measurement_task())
+            self.gatt_task = asyncio.create_task(self.gatt_events_task())
+            
+            # Store all tasks in a list for easy management
+            self.tasks = [self.advertise_task, self.measurement_task, self.gatt_task]
 
             # Run all tasks concurrently
-            await asyncio.gather(advertise_task, measurement_task, gatt_events_task)
+            await asyncio.gather(*self.tasks)
 
         except KeyboardInterrupt:
             print("Keyboard interrupt received")
@@ -508,10 +513,31 @@ class UCrimpDevice:
         print("Stopping BLE Weight Device...")
         self.is_running.clear()
 
+        # Cancel all running tasks
+        for task in self.tasks:
+            if not task.done():
+                task.cancel()
+        
+        # Wait for all tasks to complete with cancellation
+        try:
+            for task in self.tasks:
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    # This is expected when cancelling tasks
+                    pass
+                except Exception as e:
+                    print(f"Error while stopping task: {e}")
+        except Exception as e:
+            print(f"Error while stopping tasks: {e}")
+
+        # Disconnect BLE
         if self.connected_device:
             try:
                 await self.connected_device.disconnect()
             except Exception as e:
                 print(f"Error disconnecting: {e}")
+                
+        # Turn off hardware
         self.hx711.off()
         print("Device stopped successfully")
